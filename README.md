@@ -1,121 +1,144 @@
-# Flask App with MySQL Docker Setup
+# Two-Tier Web Application using Docker
 
-A small two-tier app: a Flask web app that stores messages in MySQL. Submit a message in the form; it is saved in the database and listed on the page.
+## 📌 Project Overview
 
-Stack: Python 3.13, Flask 3.1, gunicorn, PyMySQL, MySQL 8.4.
+This project demonstrates the deployment of a two-tier web application using Docker on an AWS EC2 instance.
 
-| Route | What it does |
-|---|---|
-| `GET /` | Lists all messages and shows which server answered |
-| `POST /submit` | Saves `new_message` (form field), returns it as JSON |
-| `GET /health` | Returns `{"status":"ok"}` (no database call), used by health checks |
+The application consists of two containers:
 
-## Prerequisites
+- **Flask Application** – Handles the web application.
+- **MySQL Database** – Stores the application data.
 
-- Docker with the Compose plugin (`docker compose`)
-- Git (optional, for cloning the repository)
+Both containers communicate through a custom Docker network, and a Docker volume is used to persist MySQL database data.
 
-## Run with Docker Compose
+---
 
-1. Clone and enter the repo:
+## 🏗️ Architecture
 
-   ```bash
-   git clone https://github.com/LondheShubham153/two-tier-flask-app.git
-   cd two-tier-flask-app
-   ```
+```text
+                         AWS EC2 Instance
+                                |
+                         Docker Compose
+                                |
+                    ┌───────────┴───────────┐
+                    |                       |
+              Flask App                 MySQL 8.4
+               Container                Container
+                    |                       |
+                    └────── twotier ────────┘
+                                            |
+                                      mysql-data
+                                         Volume
+Architecture Components
+AWS EC2 – Hosts the Docker containers.
+Flask App Container – Runs the Flask web application on port 5000.
+MySQL Container – Runs MySQL 8.4 and stores application data.
+Docker Network (twotier) – Allows the Flask application to communicate with MySQL.
+Docker Volume (mysql-data) – Provides persistent storage for MySQL data.
+Docker Compose – Defines and manages the Flask and MySQL services.
+🛠️ Technologies Used
+AWS EC2
+Docker
+Docker Compose
+Flask
+MySQL 8.4
+Linux
+Docker Network
+Docker Volume
+Python
+📁 Project Structure
+two-tier-flask-app/
+│
+├── Dockerfile
+├── Dockerfile-multistage
+├── docker-compose.yml
+├── app.py
+├── message.sql
+├── requirements.txt
+├── requirements-dev.txt
+├── Makefile
+├── Jenkinsfile
+├── templates/
+├── k8s/
+├── eks-manifests/
+└── Screenshots/
+🚀 Deployment
+1. Clone the Repository
+git clone <repository-url>
+cd <repository-name>
+2. Build and Start the Containers
+docker compose up -d --build
 
-2. (Optional) set your own database credentials. Without a `.env` file the defaults in `docker-compose.yml` are used.
+This command builds the Flask application image and starts both the Flask and MySQL containers.
 
-   ```bash
-   cp .env.example .env   # then edit the passwords
-   ```
+3. Check Running Containers
+docker ps
+4. Check Docker Network
+docker network ls
 
-3. Start everything:
+The application and MySQL containers communicate through the twotier network.
 
-   ```bash
-   docker compose up --build
-   ```
+5. Check Docker Volume
+docker volume ls
 
-4. Open http://localhost:5000, send a few messages. The `messages` table is created automatically.
+The mysql-data volume is used to persist MySQL database data.
 
-   > On macOS, port 5000 may already be used by *AirPlay Receiver*. Turn it off in System Settings, or change the left side of `"5000:5000"` in `docker-compose.yml`.
+🔗 Application Access
 
-5. Stop and remove the containers (`-v` also deletes the database volume):
+The Flask application runs on port 5000.
 
-   ```bash
-   docker compose down        # keep data
-   docker compose down -v     # delete data too
-   ```
+After deploying the application on AWS EC2, it can be accessed using:
 
-`make build`, `make run`, `make stop`, `make test` and `make clean` are shortcuts for the common commands.
+http://<EC2-Public-IP>:5000
 
-## Run without Docker Compose
+The required port must be allowed in the EC2 Security Group.
 
-1. Build the image and create a network:
+💾 Database Persistence
 
-   ```bash
-   docker build -t flaskapp .
-   docker network create twotier
-   ```
+MySQL data is stored using a Docker named volume:
 
-2. Start MySQL:
+mysql-data:/var/lib/mysql
 
-   ```bash
-   docker run -d \
-       --name mysql \
-       -v mysql-data:/var/lib/mysql \
-       --network=twotier \
-       -e MYSQL_DATABASE=mydb \
-       -e MYSQL_ROOT_PASSWORD=admin \
-       -p 3306:3306 \
-       mysql:8.4
-   ```
+This allows database data to persist even if the MySQL container is removed and recreated.
 
-3. Start the app (wait a few seconds for MySQL to be ready first):
+❤️ Health Checks
 
-   ```bash
-   docker run -d \
-       --name flaskapp \
-       --network=twotier \
-       -e MYSQL_HOST=mysql \
-       -e MYSQL_USER=root \
-       -e MYSQL_PASSWORD=admin \
-       -e MYSQL_DB=mydb \
-       -p 5000:5000 \
-       flaskapp:latest
-   ```
+Docker Compose includes health checks for both services.
 
-## Configuration
+The Flask application waits for the MySQL service to become healthy before starting.
 
-The app reads its database settings from environment variables:
+MySQL health is checked using mysqladmin ping.
 
-| Variable | Default |
-|---|---|
-| `MYSQL_HOST` | `localhost` |
-| `MYSQL_PORT` | `3306` |
-| `MYSQL_USER` | `default_user` |
-| `MYSQL_PASSWORD` | `default_password` |
-| `MYSQL_DB` | `default_db` |
-| `FLASK_DEBUG` | off (`1` enables debug when running `python app.py`) |
+📸 Project Screenshots
+Application Running
 
-## Tests
+Docker Containers & MySQL Data
 
-```bash
-pip install -r requirements-dev.txt
-pytest
-```
+AWS Security Group
 
-## What's in the repo
+AWS EC2 Instance
 
-| Path | Purpose |
-|---|---|
-| `Dockerfile`, `Dockerfile-multistage` | Container images (the second shows the multi-stage pattern) |
-| `docker-compose.yml`, `Makefile` | Local run |
-| `Jenkinsfile` | CI/CD pipeline |
-| `k8s/`, `eks-manifests/` | Kubernetes manifests (kubeadm cluster / Amazon EKS) |
-| **`aws/`** | **Step-by-step guide to run this app on AWS: VPC, EC2, RDS, ALB, Auto Scaling, CloudWatch** |
+Docker Volume & Network
 
-## Notes
+📚 Key Learnings
 
-- This is a demo setup. For production use real secrets management, TLS and backups.
-- If something fails, check `docker compose logs`.
+Through this project, I gained hands-on experience with:
+
+Building Docker images using a Dockerfile
+Running a Flask application inside a Docker container
+Running MySQL in a separate container
+Using Docker Compose to manage multiple containers
+Creating and using a custom Docker network
+Using Docker volumes for database persistence
+Configuring AWS EC2 Security Groups
+Deploying and accessing a containerized application on AWS EC2
+
+### One important point
+
+I would **not add Jenkins, Kubernetes, EKS, or the multistage Dockerfile to the deployment explanation yet**, even though those files exist in your repository. Those may be additional files/features from the original project, and we shouldn't claim you used them in *this deployment* unless we verify them.
+
+For the README you're currently documenting, the important actual flow from your Compose file is:
+
+**AWS EC2 → Docker Compose → Flask Container + MySQL Container → Docker Network + Docker Volume.**
+
+Also, your screenshot filenames contain spaces, so the `%20` in the README image paths is intentional and important for GitHub.
